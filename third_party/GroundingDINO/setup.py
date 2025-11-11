@@ -31,7 +31,10 @@ def install_torch():
     try:
         import torch
     except ImportError:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "torch"])
+        # Skip automatic torch installation - torch should be pre-installed
+        print("Warning: torch not found during setup, assuming it will be available at runtime")
+        return
+        # subprocess.check_call([sys.executable, "-m", "pip", "install", "torch"])
 
 # Call the function to ensure torch is installed
 install_torch()

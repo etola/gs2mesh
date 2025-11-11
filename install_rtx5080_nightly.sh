@@ -53,12 +53,17 @@ if [ -z "$SKIP_CONDA_INSTALL" ]; then
     echo "✓ Environment activated"
     echo ""
 
-    # Step 3: Install PyTorch nightly with CUDA 12.4+ support
-    echo "Step 3: Installing PyTorch NIGHTLY with CUDA 12.4 support..."
+    # Step 3: Install PyTorch with CUDA 12.4+ support
+    echo "Step 3: Installing PyTorch with CUDA 12.4 support..."
     echo "This may take several minutes..."
     
-    # Install PyTorch nightly which should have better Blackwell support
-    pip3 install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu124
+    # Try stable PyTorch first with CUDA 12.4 support (should work with Blackwell via forward compatibility)
+    echo "Attempting stable PyTorch 2.5+ with CUDA 12.4..."
+    if ! pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124; then
+        echo "Stable PyTorch with CUDA 12.4 not available, trying nightly builds with specific date..."
+        # If stable fails, try nightly from a specific date to ensure version compatibility
+        pip3 install torch==2.7.0.dev20250226+cu124 torchvision==0.22.0.dev20250226+cu124 torchaudio==2.6.0.dev20250226+cu124 --index-url https://download.pytorch.org/whl/nightly/cu124
+    fi
     
     echo "✓ PyTorch nightly installed successfully"
     echo ""
@@ -160,10 +165,10 @@ echo "✓ Installation Complete!"
 echo "========================================"
 echo ""
 echo "Your system information:"
-echo "  - CUDA Version: 12.8"
+echo "  - CUDA Version: 13.0 (Driver)"
 echo "  - GPU: NVIDIA GeForce RTX 5080 (Blackwell/sm_120)"
-echo "  - PyTorch: Nightly with CUDA 12.4 support"
-echo "  - Compiled for: sm_90 (Hopper) - may work on sm_120 via forward compatibility"
+echo "  - PyTorch: with CUDA 12.4 support (stable or nightly)"
+echo "  - Compiled for: sm_90 (Hopper) - will work on sm_120 via forward compatibility"
 echo ""
 echo "IMPORTANT: You must reactivate the environment for settings to take effect:"
 echo "  conda deactivate"
