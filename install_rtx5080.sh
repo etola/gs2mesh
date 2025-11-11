@@ -2,14 +2,18 @@
 
 # GS2Mesh Installation Script for RTX 5080 (Blackwell Architecture)
 # For CUDA 12.8+ / RTX 5080
-# Uses PyTorch 2.5+ with support for sm_120 (Blackwell)
+# Uses PyTorch NIGHTLY with potential support for sm_120 (Blackwell)
 
 set -e  # Exit on error
 
 echo "========================================"
 echo "GS2Mesh Installation Script"
-echo "RTX 5080 (Blackwell) Edition"
+echo "RTX 5080 (Blackwell) - NIGHTLY Edition"
 echo "========================================"
+echo ""
+echo "WARNING: This uses PyTorch nightly builds which may be unstable"
+echo "Press Ctrl+C to cancel, or wait 5 seconds to continue..."
+sleep 5
 echo ""
 
 # Get the script directory
@@ -20,8 +24,8 @@ echo "Installing in directory: $SCRIPT_DIR"
 echo ""
 
 # Step 1: Create conda environment
-echo "Step 1: Creating conda environment 'gs2mesh' with Python 3.10..."
-echo "Note: Using Python 3.10 for better compatibility with newer PyTorch"
+echo "Step 1: Creating conda environment 'gs2mesh' with Python 3.11..."
+echo "Note: Using Python 3.11 for best compatibility with nightly PyTorch"
 if conda env list | grep -q "^gs2mesh "; then
     echo "Warning: Environment 'gs2mesh' already exists."
     read -p "Do you want to remove and recreate it? (y/n) " -n 1 -r
@@ -38,7 +42,7 @@ if conda env list | grep -q "^gs2mesh "; then
 fi
 
 if [ -z "$SKIP_CONDA_INSTALL" ]; then
-    conda create --name gs2mesh python=3.10 -y
+    conda create --name gs2mesh python=3.11 -y
     echo "✓ Environment created successfully"
     echo ""
 
@@ -49,14 +53,25 @@ if [ -z "$SKIP_CONDA_INSTALL" ]; then
     echo "✓ Environment activated"
     echo ""
 
-    # Step 3: Install PyTorch 2.5+ with CUDA 12.4+ support (supports sm_120)
-    echo "Step 3: Installing PyTorch 2.5.1 with CUDA 12.4 support (Blackwell/sm_120 compatible)..."
+    # Step 2.5: Set CUDA 13.0 environment (matching PyTorch cu130)
+    echo "Step 2.5: Configuring CUDA 13.0 environment..."
+    export CUDA_HOME=/usr/local/cuda-13.0
+    export PATH=/usr/local/cuda-13.0/bin:$PATH
+    export LD_LIBRARY_PATH=/usr/local/cuda-13.0/lib64:$LD_LIBRARY_PATH
+    conda env config vars set CUDA_HOME=/usr/local/cuda-13.0 -n gs2mesh
+    echo "✓ CUDA 13.0 environment configured"
+    echo "  CUDA_HOME: /usr/local/cuda-13.0"
+    echo ""
+    
+    # Step 3: Install PyTorch with CUDA 13.0 support (matching CUDA 13.0 toolkit)
+    echo "Step 3: Installing PyTorch NIGHTLY with CUDA 13.0 support..."
     echo "This may take several minutes..."
+    echo "  Note: Using cu130 (CUDA 13.0) matching your CUDA 13.0 toolkit and driver"
     
-    # Install PyTorch 2.5.1 which should support Blackwell GPUs
-    pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu124
+    # Install PyTorch nightly with CUDA 13.0 support - perfect match for RTX 5080
+    pip3 install --upgrade --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu130
     
-    echo "✓ PyTorch installed successfully"
+    echo "✓ PyTorch nightly with CUDA 13.0 installed successfully"
     echo ""
     
     # Install COLMAP separately via conda
@@ -65,24 +80,22 @@ if [ -z "$SKIP_CONDA_INSTALL" ]; then
     echo "✓ COLMAP installed successfully"
     echo ""
 
-    # Step 4: Set environment variable for sm_120 support
+    # Step 4: Set environment variables for RTX 5080 / Blackwell
     echo "Step 4: Setting CUDA architecture flags for RTX 5080..."
-    # This tells PyTorch to compile CUDA extensions for sm_120 (Blackwell)
-    export TORCH_CUDA_ARCH_LIST="8.9;9.0;12.0"
-    conda env config vars set TORCH_CUDA_ARCH_LIST="8.9;9.0;12.0" -n gs2mesh
-    echo "✓ CUDA architecture flags set"
+    # Set both sm_90 and sm_120 for best compatibility with RTX 5080
+    # sm_90: Hopper architecture (fallback compatibility)
+    # sm_120: Blackwell architecture (RTX 5080 native)
+    export TORCH_CUDA_ARCH_LIST="9.0;12.0"
+    conda env config vars set TORCH_CUDA_ARCH_LIST="9.0;12.0" -n gs2mesh
+    echo "✓ CUDA architecture flags set to sm_90 and sm_120"
+    echo "  Note: Compiling for both Hopper (sm_90) and Blackwell (sm_120) architectures"
     echo ""
 
     # Step 5: Install additional dependencies from requirements.txt
     echo "Step 5: Installing additional dependencies from requirements.txt..."
     
-    # Install Open3D with a version compatible with Python 3.10
-    pip install open3d==0.18.0
-    
-    # Install other dependencies (excluding open3d since we already installed it)
-    grep -v "open3d" requirements.txt > /tmp/requirements_temp.txt
-    pip install -r /tmp/requirements_temp.txt
-    rm /tmp/requirements_temp.txt
+    # Install Open3D with a version compatible with Python 3.11
+    pip install -r requirements.txt
     
     echo "✓ Additional dependencies installed successfully"
     echo ""
@@ -155,25 +168,24 @@ echo "✓ Installation Complete!"
 echo "========================================"
 echo ""
 echo "Your system information:"
-echo "  - CUDA Version: 12.8"
+echo "  - CUDA Version: 13.0 (Driver)"
 echo "  - GPU: NVIDIA GeForce RTX 5080 (Blackwell/sm_120)"
-echo "  - PyTorch: 2.5.1 with CUDA 12.4 support"
-echo "  - CUDA Architectures: 8.9, 9.0, 12.0 (sm_120 for RTX 5080)"
+echo "  - PyTorch: Nightly with CUDA 13.0 support"
+echo "  - CUDA Extensions compiled for: sm_90 (Hopper) and sm_120 (Blackwell/RTX 5080)"
 echo ""
-echo "IMPORTANT: You must reactivate the environment for CUDA arch settings to take effect:"
+echo "IMPORTANT: You must reactivate the environment for settings to take effect:"
 echo "  conda deactivate"
 echo "  conda activate gs2mesh"
 echo ""
 echo "To test the installation, run:"
 echo "  python -c 'import torch; print(f\"PyTorch: {torch.__version__}\"); print(f\"CUDA Available: {torch.cuda.is_available()}\"); print(f\"CUDA Version: {torch.version.cuda}\"); print(f\"GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"N/A\"}\")'"
 echo ""
-echo "For usage examples, check the README.md or run:"
-echo "  - DTU dataset: python run_and_evaluate_dtu.py"
-echo "  - Custom data: python run_single.py --colmap_name <data_name> --video_extension <extension>"
-echo ""
-echo "Note: Due to the newer RTX 5080 GPU, some CUDA extensions will be compiled"
-echo "on first use. This is normal and may take a few minutes."
-echo ""
-echo "Happy 3D reconstructing on your powerful RTX 5080!"
+echo "⚠️  IMPORTANT NOTES FOR RTX 5080:"
+echo "  1. Using PyTorch NIGHTLY with CUDA 13.0"
+echo "  2. CUDA 13.0 toolkit, driver, and PyTorch all aligned"
+echo "  3. CUDA extensions compiled for both sm_90 (Hopper) and sm_120 (Blackwell/RTX 5080)"
+echo "  4. This setup provides optimal performance for RTX 5080"
+echo "  5. If you encounter issues:"
+echo "     - Try updating PyTorch nightly: pip install --upgrade --pre torch --index-url https://download.pytorch.org/whl/nightly/cu130"
 echo ""
 
