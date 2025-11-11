@@ -1,13 +1,14 @@
 #!/bin/bash
 
-# GS2Mesh Installation Script
-# For CUDA 13.0 / RTX 3080 Ti
-# This script installs gs2mesh with PyTorch compatible with CUDA 12.1+
+# GS2Mesh Installation Script for RTX 5080 (Blackwell Architecture)
+# For CUDA 12.8+ / RTX 5080
+# Uses PyTorch 2.5+ with support for sm_120 (Blackwell)
 
 set -e  # Exit on error
 
 echo "========================================"
 echo "GS2Mesh Installation Script"
+echo "RTX 5080 (Blackwell) Edition"
 echo "========================================"
 echo ""
 
@@ -19,7 +20,8 @@ echo "Installing in directory: $SCRIPT_DIR"
 echo ""
 
 # Step 1: Create conda environment
-echo "Step 1: Creating conda environment 'gs2mesh' with Python 3.8..."
+echo "Step 1: Creating conda environment 'gs2mesh' with Python 3.10..."
+echo "Note: Using Python 3.10 for better compatibility with newer PyTorch"
 if conda env list | grep -q "^gs2mesh "; then
     echo "Warning: Environment 'gs2mesh' already exists."
     read -p "Do you want to remove and recreate it? (y/n) " -n 1 -r
@@ -36,7 +38,7 @@ if conda env list | grep -q "^gs2mesh "; then
 fi
 
 if [ -z "$SKIP_CONDA_INSTALL" ]; then
-    conda create --name gs2mesh python=3.8 -y
+    conda create --name gs2mesh python=3.10 -y
     echo "✓ Environment created successfully"
     echo ""
 
@@ -47,22 +49,47 @@ if [ -z "$SKIP_CONDA_INSTALL" ]; then
     echo "✓ Environment activated"
     echo ""
 
-    # Step 3: Install PyTorch with CUDA 12.1 support
-    echo "Step 3: Installing PyTorch 2.3.1 with CUDA 12.1 support..."
+    # Step 3: Install PyTorch 2.5+ with CUDA 12.4+ support (supports sm_120)
+    echo "Step 3: Installing PyTorch 2.5.1 with CUDA 12.4 support (Blackwell/sm_120 compatible)..."
     echo "This may take several minutes..."
-    conda install pytorch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1 pytorch-cuda=12.1 colmap -c pytorch -c nvidia -c conda-forge -y
+    
+    # Install PyTorch 2.5.1 which should support Blackwell GPUs
+    pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu124
+    
     echo "✓ PyTorch installed successfully"
     echo ""
+    
+    # Install COLMAP separately via conda
+    echo "Step 3.5: Installing COLMAP..."
+    conda install colmap -c conda-forge -y
+    echo "✓ COLMAP installed successfully"
+    echo ""
 
-    # Step 4: Install additional dependencies from requirements.txt
-    echo "Step 4: Installing additional dependencies from requirements.txt..."
-    pip install -r requirements.txt
+    # Step 4: Set environment variable for sm_120 support
+    echo "Step 4: Setting CUDA architecture flags for RTX 5080..."
+    # This tells PyTorch to compile CUDA extensions for sm_120 (Blackwell)
+    export TORCH_CUDA_ARCH_LIST="8.9;9.0;12.0"
+    conda env config vars set TORCH_CUDA_ARCH_LIST="8.9;9.0;12.0" -n gs2mesh
+    echo "✓ CUDA architecture flags set"
+    echo ""
+
+    # Step 5: Install additional dependencies from requirements.txt
+    echo "Step 5: Installing additional dependencies from requirements.txt..."
+    
+    # Install Open3D with a version compatible with Python 3.10
+    pip install open3d==0.18.0
+    
+    # Install other dependencies (excluding open3d since we already installed it)
+    grep -v "open3d" requirements.txt > /tmp/requirements_temp.txt
+    pip install -r /tmp/requirements_temp.txt
+    rm /tmp/requirements_temp.txt
+    
     echo "✓ Additional dependencies installed successfully"
     echo ""
 fi
 
-# Step 5: Download DLNR Stereo weights
-echo "Step 5: Downloading DLNR Stereo weights..."
+# Step 6: Download DLNR Stereo weights
+echo "Step 6: Downloading DLNR Stereo weights..."
 mkdir -p third_party/DLNR/pretrained
 cd third_party/DLNR/pretrained
 
@@ -85,8 +112,8 @@ fi
 cd "$SCRIPT_DIR"
 echo ""
 
-# Step 6: Download GroundingDINO weights
-echo "Step 6: Downloading GroundingDINO weights (for automatic masking)..."
+# Step 7: Download GroundingDINO weights
+echo "Step 7: Downloading GroundingDINO weights (for automatic masking)..."
 mkdir -p third_party/GroundingDINO/weights
 cd third_party/GroundingDINO/weights
 
@@ -101,8 +128,8 @@ fi
 cd "$SCRIPT_DIR"
 echo ""
 
-# Step 7: Optional - Download SAM2 weights (optional, as they auto-download)
-echo "Step 7: SAM2 weights (optional)..."
+# Step 8: Optional - Download SAM2 weights (optional, as they auto-download)
+echo "Step 8: SAM2 weights (optional)..."
 echo "Note: SAM2 weights will auto-download via Huggingface when needed."
 read -p "Do you want to download SAM2 weights locally? (y/n) " -n 1 -r
 echo
@@ -128,20 +155,25 @@ echo "✓ Installation Complete!"
 echo "========================================"
 echo ""
 echo "Your system information:"
-echo "  - CUDA Version: 13.0"
-echo "  - GPU: NVIDIA GeForce RTX 3080 Ti (12GB)"
-echo "  - PyTorch: 2.3.1 with CUDA 12.1 support"
+echo "  - CUDA Version: 12.8"
+echo "  - GPU: NVIDIA GeForce RTX 5080 (Blackwell/sm_120)"
+echo "  - PyTorch: 2.5.1 with CUDA 12.4 support"
+echo "  - CUDA Architectures: 8.9, 9.0, 12.0 (sm_120 for RTX 5080)"
 echo ""
-echo "To activate the environment, run:"
+echo "IMPORTANT: You must reactivate the environment for CUDA arch settings to take effect:"
+echo "  conda deactivate"
 echo "  conda activate gs2mesh"
 echo ""
-echo "To test the installation, you can run:"
-echo "  python -c 'import torch; print(f\"PyTorch: {torch.__version__}\"); print(f\"CUDA Available: {torch.cuda.is_available()}\"); print(f\"CUDA Version: {torch.version.cuda}\")'"
+echo "To test the installation, run:"
+echo "  python -c 'import torch; print(f\"PyTorch: {torch.__version__}\"); print(f\"CUDA Available: {torch.cuda.is_available()}\"); print(f\"CUDA Version: {torch.version.cuda}\"); print(f\"GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"N/A\"}\")'"
 echo ""
 echo "For usage examples, check the README.md or run:"
 echo "  - DTU dataset: python run_and_evaluate_dtu.py"
 echo "  - Custom data: python run_single.py --colmap_name <data_name> --video_extension <extension>"
 echo ""
-echo "Happy 3D reconstructing!"
+echo "Note: Due to the newer RTX 5080 GPU, some CUDA extensions will be compiled"
+echo "on first use. This is normal and may take a few minutes."
+echo ""
+echo "Happy 3D reconstructing on your powerful RTX 5080!"
 echo ""
 
